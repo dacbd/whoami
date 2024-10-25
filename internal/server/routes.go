@@ -5,22 +5,34 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	//"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httplog/v2"
 )
 
-func parseIP(raw string) string {
-	logger := slog.Default().WithGroup("parseIp").With("input", raw)
+func parseIP(logger *slog.Logger, raw string) string {
 	host, _, err := net.SplitHostPort(raw)
 	if err != nil {
-		slog.Warn("error spliting host and port", "error", err)
+		logger.Warn("error spliting host and port", "error", err)
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		return ip.String()
 	}
 	logger.Warn("Returning blank")
+	return ""
+}
+
+func parseForwardFor(logger *slog.Logger, raw string) string {
+	vals := strings.Split(raw, ",")
+	logger.Debug("parseForwardFor", "len", len(vals))
+	for _, v := range vals {
+		parsedIP := parseIP(logger, strings.Trim(v, " "))
+		if parsedIP != "" {
+			return parsedIP
+		}
+	}
 	return ""
 }
 
@@ -37,7 +49,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 func (s *Server) WhoAmIHandler(w http.ResponseWriter, r *http.Request) {
 	logger := httplog.LogEntry(r.Context())
-	rawIP := parseIP(r.RemoteAddr)
+	rawIP := parseIP(logger, r.RemoteAddr)
 	logger.Info("WhoAmI Request", "rawIP", rawIP)
 	headers := r.Header
 	logger.Info("IP Headers",
@@ -47,7 +59,15 @@ func (s *Server) WhoAmIHandler(w http.ResponseWriter, r *http.Request) {
 		"Via", headers.Get("Via"),
 	)
 
-	if _, err := w.Write([]byte(fmt.Sprintln(rawIP))); err != nil {
+	forwardedIP := parseForwardFor(logger, headers.Get("X-Forwared-For"))
+	var realIP string
+	if forwardedIP != "" {
+		realIP = forwardedIP
+	} else {
+		realIP = rawIP
+	}
+
+	if _, err := w.Write([]byte(fmt.Sprintln(realIP))); err != nil {
 		logger.Error("ResponseWriter.Write failed", "err", err)
 	}
 }
