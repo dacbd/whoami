@@ -59,7 +59,7 @@ func (s *Server) WhoAmIHandler(w http.ResponseWriter, r *http.Request) {
 		"Via", headers.Get("Via"),
 	)
 
-	forwardedIP := parseForwardFor(logger, headers.Get("X-Forwared-For"))
+	forwardedIP := parseForwardFor(logger, headers.Get("X-Forwarded-For"))
 	var realIP string
 	if forwardedIP != "" {
 		realIP = forwardedIP
