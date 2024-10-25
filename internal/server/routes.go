@@ -28,7 +28,7 @@ func parseForwardFor(logger *slog.Logger, raw string) string {
 	vals := strings.Split(raw, ",")
 	logger.Debug("parseForwardFor", "len", len(vals))
 	for _, v := range vals {
-		parsedIP := parseIP(logger, strings.Trim(v, " "))
+		parsedIP := strings.Trim(v, " ")
 		if parsedIP != "" {
 			return parsedIP
 		}
